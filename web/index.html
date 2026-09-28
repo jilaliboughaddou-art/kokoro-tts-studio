@@ -369,8 +369,8 @@
       <div>
         <label for="deviceSelect">Inference Device:</label>
         <select id="deviceSelect">
-          <option value="webgpu">WebGPU (Client GPU Acceleration)</option>
-          <option value="wasm">WebAssembly (Client CPU Fallback)</option>
+          <option value="wasm" selected>WebAssembly (CPU) - Recommended (Pristine Audio)</option>
+          <option value="webgpu">WebGPU (Experimental GPU - Can cause distortion on some drivers)</option>
         </select>
       </div>
     </div>
@@ -565,15 +565,14 @@
   const statDuration = document.getElementById("statDuration");
   const downloadWavBtn = document.getElementById("downloadWavBtn");
 
-  // Initial Hardware Check
+  // Initial Hardware Check - default to WASM for audio stability
+  deviceSelect.value = "wasm";
   if (hasWebGPU) {
     hardwareBadge.className = "hardware-badge";
-    hardwareBadge.innerHTML = "⚡ WebGPU Available (GPU)";
-    deviceSelect.value = "webgpu";
+    hardwareBadge.innerHTML = "⚡ WebGPU Detected";
   } else {
     hardwareBadge.className = "hardware-badge wasm";
-    hardwareBadge.innerHTML = "💻 WebGPU Not Detected (CPU WASM)";
-    deviceSelect.value = "wasm";
+    hardwareBadge.innerHTML = "💻 WebAssembly (CPU)";
   }
 
   // Populate Voices
