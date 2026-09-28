@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kokoro TTS Studio - Rust + ONNX</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(18, 24, 38, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover: rgba(255, 255, 255, 0.12);
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --primary-glow: rgba(99, 102, 241, 0.35);
+      --accent: #06b6d4;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --input-bg: rgba(11, 15, 25, 0.85);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.12) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1080px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 4px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .logo-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-icon {
+      width: 46px;
+      height: 46px;
+      background: linear-gradient(135deg, #6366f1, #06b6d4);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px var(--primary-glow);
+    }
+
+    .logo-icon svg {
+      width: 26px;
+      height: 26px;
+      fill: white;
+    }
+
+    .title-area h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(to right, #ffffff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .title-area p {
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-pill {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: rgba(99, 102, 241, 0.18);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .badge-pill:hover {
+      background: rgba(99, 102, 241, 0.3);
+      color: #fff;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 22px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      transition: border-color 0.2s;
+    }
+
+    .card:hover {
+      border-color: var(--card-hover);
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Model Status Banner */
+    .model-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: var(--warning);
+      box-shadow: 0 0 10px var(--warning);
+      transition: all 0.3s;
+    }
+
+    .status-dot.ready {
+      background-color: var(--success);
+      box-shadow: 0 0 10px var(--success);
+    }
+
+    .status-dot.downloading {
+      background-color: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: 0.7; }
+    }
+
+    .status-text h3 {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .status-text p {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .download-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(6, 182, 212, 0.25));
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      color: white;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .download-btn:hover:not(:disabled) {
+      background: linear-gradient(135deg, #6366f1, #06b6d4);
+      box-shadow: 0 0 16px var(--primary-glow);
+      transform: translateY(-1px);
+    }
+
+    .download-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Progress bar */
+    .progress-box {
+      width: 100%;
+      margin-top: 14px;
+      display: none;
+    }
+
+    .progress-box.active {
+      display: block;
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #6366f1, #06b6d4);
+      border-radius: 99px;
+      transition: width 0.3s ease;
+    }
+
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Grid Layout */
+    .grid-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+
+    @media (min-width: 920px) {
+      .grid-layout {
+        grid-template-columns: 1.5fr 1.1fr;
+      }
+    }
+
+    /* Text Area */
+    .textarea-wrapper {
+      position: relative;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 190px;
+      padding: 16px;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 15px;
+      line-height: 1.6;
+      resize: vertical;
+      transition: all 0.2s;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+
+    .textarea-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .sample-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .chip {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .chip:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Filter Controls */
+    .filters-section {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .search-input-wrapper {
+      position: relative;
+    }
+
+    .search-input-wrapper svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      color: var(--text-dim);
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 9px 12px 9px 36px;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    }
+
+    .filter-pills-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .filter-pill {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .filter-pill:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+    }
+
+    .filter-pill.active {
+      background: rgba(99, 102, 241, 0.25);
+      border-color: var(--primary);
+      color: #c7d2fe;
+      font-weight: 600;
+    }
+
+    .dropdown-filter-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 8px;
+    }
+
+    .filter-select {
+      width: 100%;
+      padding: 7px 10px;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 12px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .filter-select:focus {
+      border-color: var(--primary);
+    }
+
+    /* Selected Voice Profile Card */
+    .voice-profile-card {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(6, 182, 212, 0.08));
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .voice-profile-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .voice-name-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      color: #fff;
+    }
+
+    .tag-pill {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+    }
+
+    .tag-pill.tone {
+      background: rgba(6, 182, 212, 0.15);
+      border-color: rgba(6, 182, 212, 0.3);
+      color: #67e8f9;
+    }
+
+    .tag-pill.speed {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.3);
+      color: #fde68a;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tag-pill.speed:hover {
+      background: rgba(245, 158, 11, 0.3);
+      color: #fff;
+    }
+
+    .voice-profile-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .preview-voice-btn {
+      font-size: 11px;
+      padding: 3px 8px;
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      color: #a5b4fc;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .preview-voice-btn:hover {
+      background: var(--primary);
+      color: white;
+    }
+
+    /* Controls Panel */
+    .control-group {
+      margin-bottom: 18px;
+    }
+
+    .control-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .control-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .control-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      background: rgba(6, 182, 212, 0.1);
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    select.main-select {
+      width: 100%;
+      padding: 11px 14px;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    select.main-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+
+    optgroup {
+      background: #111827;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    option {
+      background: #0f172a;
+      color: var(--text);
+      padding: 6px;
+    }
+
+    /* Custom Sliders */
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 99px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--primary);
+      box-shadow: 0 0 10px var(--primary-glow);
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    /* Primary Generate Button */
+    .generate-btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+      border: none;
+      border-radius: 12px;
+      color: white;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 4px 20px var(--primary-glow);
+      transition: all 0.2s;
+      margin-top: 10px;
+    }
+
+    .generate-btn:hover:not(:disabled) {
+      background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+      box-shadow: 0 6px 26px rgba(124, 58, 237, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .generate-btn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Output Card */
+    .output-section {
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .output-section.active {
+      display: flex;
+    }
+
+    .player-box {
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    audio {
+      width: 100%;
+      height: 44px;
+      filter: invert(1) hue-rotate(180deg);
+    }
+
+    .audio-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+    }
+
+    .stat-pill {
+      background: rgba(255, 255, 255, 0.04);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+    }
+
+    .stat-pill span {
+      display: block;
+      font-size: 11px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-pill strong {
+      font-size: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent);
+    }
+
+    .action-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .download-wav-btn {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: #34d399;
+    }
+
+    .download-wav-btn:hover {
+      background: rgba(16, 185, 129, 0.25);
+      border-color: #34d399;
+    }
+
+    /* History list */
+    .history-card {
+      margin-top: 10px;
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+    .history-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    .history-item .hist-text {
+      max-width: 450px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+    }
+
+    .history-item .hist-meta {
+      font-size: 11px;
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .play-mini-btn {
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      color: #a5b4fc;
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .play-mini-btn:hover {
+      background: var(--primary);
+      color: white;
+    }
+
+    /* Alert / Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 20px;
+      border-radius: 10px;
+      background: #1e293b;
+      border: 1px solid var(--card-border);
+      color: white;
+      font-size: 13px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.3s;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <header>
+    <div class="logo-group">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+      </div>
+      <div class="title-area">
+        <h1>Kokoro TTS Studio</h1>
+        <p>
+          High-performance local text-to-speech in Rust
+          <a class="badge-pill" href="https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX" target="_blank" rel="noreferrer">
+            onnx-community/Kokoro-82M-v1.0-ONNX ↗
+          </a>
+        </p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Model Management & Hugging Face Status Card -->
+  <div class="card">
+    <div class="model-banner">
+      <div class="status-indicator">
+        <div id="statusDot" class="status-dot"></div>
+        <div class="status-text">
+          <h3 id="modelStatusTitle">Checking model status...</h3>
+          <p id="modelStatusDetails">Connecting to local Rust backend...</p>
+        </div>
+      </div>
+
+      <div class="model-controls" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); font-weight:600;">Model Precision / Quantization</label>
+          <select id="quantizationSelect" class="filter-select" style="min-width:230px; font-weight:500;" onchange="handleQuantChange()">
+            <option value="quantized" selected>INT8 Quantized (~88 MB) - Fast CPU</option>
+            <option value="fp32">FP32 Full Precision (~311 MB) - Highest Quality</option>
+            <option value="fp16">FP16 Half Precision (~156 MB)</option>
+            <option value="q8f16">Q8_F16 Mixed (~82 MB) - Smallest</option>
+            <option value="q4f16">Q4_F16 4-bit (~147 MB)</option>
+            <option value="q4">Q4 Quantized (~291 MB)</option>
+            <option value="uint8">UINT8 Quantized (~169 MB)</option>
+          </select>
+        </div>
+        <button id="downloadModelBtn" class="download-btn" onclick="triggerDownload()" style="align-self:flex-end;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          <span id="downloadBtnText">Switch / Download</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Live Download Progress Bar -->
+    <div id="progressBox" class="progress-box">
+      <div class="progress-bar-bg">
+        <div id="progressBarFill" class="progress-bar-fill"></div>
+      </div>
+      <div class="progress-meta">
+        <span id="progressStatusText">Starting download...</span>
+        <span id="progressPercentage">0.0%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Generation Form -->
+  <div class="grid-layout">
+    <!-- Left Column: Text & Presets -->
+    <div class="card">
+      <div class="card-title">
+        <span>Input Text</span>
+        <span id="charCount" style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:normal; text-transform:none;">0 chars</span>
+      </div>
+
+      <div class="sample-chips">
+        <span class="chip" onclick="setPreset('intro')">👋 Introduction</span>
+        <span class="chip" onclick="setPreset('story')">📖 Storytelling</span>
+        <span class="chip" onclick="setPreset('news')">🎙️ News Update</span>
+        <span class="chip" onclick="setPreset('tech')">⚡ Fast Tech</span>
+      </div>
+
+      <div class="textarea-wrapper">
+        <textarea id="textInput" placeholder="Type or paste text here to generate high-fidelity speech... (Press Ctrl + Enter to synthesize)">The Kokoro model is a lightweight, open-weight text-to-speech model with 82 million parameters that produces remarkably natural voice audio directly on CPU.</textarea>
+      </div>
+
+      <div class="textarea-footer">
+        <span>Tip: Use punctuation like periods, commas, and dashes for expressive pausing.</span>
+        <span style="cursor:pointer; color:var(--accent);" onclick="document.getElementById('textInput').value=''; updateCharCount();">Clear</span>
+      </div>
+    </div>
+
+    <!-- Right Column: Voice & Synthesis Parameters -->
+    <div class="card">
+      <div class="card-title">
+        <span>Voice & Parameters</span>
+        <span id="voiceCountBadge" class="control-val">54 voices</span>
+      </div>
+
+      <!-- Speaker Filter Toolbar -->
+      <div class="filters-section">
+        <!-- Search -->
+        <div class="search-input-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" id="voiceSearch" class="search-input" placeholder="Search voices by name, ID, or style..." oninput="onFilterChange()">
+        </div>
+
+        <!-- Gender Pills -->
+        <div class="filter-pills-row">
+          <span class="filter-pill active" data-gender="All" onclick="setGenderFilter('All')">All Gender (54)</span>
+          <span class="filter-pill" data-gender="Female" onclick="setGenderFilter('Female')">♀ Female (29)</span>
+          <span class="filter-pill" data-gender="Male" onclick="setGenderFilter('Male')">♂ Male (25)</span>
+        </div>
+
+        <!-- Tone & Language Dropdown Filters -->
+        <div class="dropdown-filter-grid">
+          <select id="languageFilter" class="filter-select" onchange="onFilterChange()">
+            <option value="All">🌐 All Languages</option>
+            <option value="English">English (US/UK)</option>
+            <option value="Japanese">Japanese 🇯🇵</option>
+            <option value="Chinese">Chinese 🇨🇳</option>
+            <option value="Spanish">Spanish 🇪🇸</option>
+            <option value="French">French 🇫🇷</option>
+            <option value="Italian">Italian 🇮🇹</option>
+            <option value="Portuguese">Portuguese 🇧🇷</option>
+            <option value="Hindi">Hindi 🇮🇳</option>
+          </select>
+
+          <select id="toneFilter" class="filter-select" onchange="onFilterChange()">
+            <option value="All">🎭 All Tones</option>
+            <option value="Narrator">Narrator / Deep</option>
+            <option value="Warm">Warm / Natural</option>
+            <option value="Clear">Clear / Expressive</option>
+            <option value="Bright">Bright / Energetic</option>
+            <option value="Calm">Calm / Relaxed</option>
+            <option value="News">News / Formal</option>
+            <option value="Soft">Soft / Gentle</option>
+            <option value="Playful">Playful / Festive</option>
+          </select>
+
+          <select id="paceFilter" class="filter-select" onchange="onFilterChange()">
+            <option value="All">⏱️ All Speeds</option>
+            <option value="Relaxed">Relaxed (~0.90x)</option>
+            <option value="Standard">Standard (1.00x)</option>
+            <option value="Brisk">Brisk (~1.05x)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Main Speaker Select -->
+      <div class="control-group">
+        <div class="control-header">
+          <label class="control-label" for="voiceSelect">Talking Speaker</label>
+          <span id="filteredMatchCount" style="font-size:11px; color:var(--text-dim); font-family:'JetBrains Mono',monospace;">54 matches</span>
+        </div>
+        <select id="voiceSelect" class="main-select" onchange="onVoiceSelectionChanged()"></select>
+
+        <!-- Selected Voice Profile Detail Card -->
+        <div id="voiceProfileCard" class="voice-profile-card">
+          <div class="voice-profile-header">
+            <div class="voice-name-badge">
+              <span id="vpFlag">🇺🇸</span>
+              <span id="vpName">Sky</span>
+              <span id="vpId" class="tag-pill">af_sky</span>
+            </div>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <span id="vpGender" class="tag-pill">♀ Female</span>
+              <span id="vpTone" class="tag-pill tone">Clear</span>
+              <span id="vpSpeedPill" class="tag-pill speed" title="Click to apply recommended speed" onclick="applyRecommendedSpeed()">⚡ 1.00x (Apply)</span>
+            </div>
+          </div>
+          <div class="voice-profile-desc">
+            <span id="vpDesc">Expressive & clear (Default)</span>
+            <button class="preview-voice-btn" onclick="previewCurrentVoice()">▶ Say Name</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Speed Control -->
+      <div class="control-group">
+        <div class="control-header">
+          <label class="control-label">Speed</label>
+          <span id="speedVal" class="control-val">1.00x</span>
+        </div>
+        <input type="range" id="speedSlider" min="0.5" max="2.0" step="0.05" value="1.0" oninput="updateSpeed(this.value)">
+      </div>
+
+      <!-- Pitch Control -->
+      <div class="control-group">
+        <div class="control-header">
+          <label class="control-label">Pitch (Semitones)</label>
+          <span id="pitchVal" class="control-val">0 (Natural)</span>
+        </div>
+        <input type="range" id="pitchSlider" min="-12" max="12" step="1" value="0" oninput="updatePitch(this.value)">
+      </div>
+
+      <!-- Gain / Volume -->
+      <div class="control-group">
+        <div class="control-header">
+          <label class="control-label">Volume Gain</label>
+          <span id="gainVal" class="control-val">1.00x</span>
+        </div>
+        <input type="range" id="gainSlider" min="0.4" max="1.6" step="0.05" value="1.0" oninput="updateGain(this.value)">
+      </div>
+
+      <!-- Generate Button -->
+      <button id="generateBtn" class="generate-btn" onclick="generateSpeech()">
+        <div id="btnSpinner" class="spinner"></div>
+        <svg id="btnIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span id="btnText">Generate Speech</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Audio Player & Output Result -->
+  <div id="outputCard" class="card output-section">
+    <div class="card-title">
+      <span>Audio Output</span>
+      <span id="outputVoiceTag" class="badge-pill">af_sky</span>
+    </div>
+
+    <div class="player-box">
+      <audio id="audioPlayer" controls></audio>
+      
+      <div class="audio-stats">
+        <div class="stat-pill">
+          <span>Duration</span>
+          <strong id="statDuration">0.0s</strong>
+        </div>
+        <div class="stat-pill">
+          <span>Latency</span>
+          <strong id="statLatency">0ms</strong>
+        </div>
+        <div class="stat-pill">
+          <span>Sample Rate</span>
+          <strong id="statSampleRate">24,000 Hz</strong>
+        </div>
+        <div class="stat-pill">
+          <span>Samples</span>
+          <strong id="statSamples">0</strong>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button id="downloadWavBtn" class="action-btn download-wav-btn" onclick="downloadCurrentWav()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download WAV Audio
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Session History -->
+  <div id="historyCard" class="card history-card" style="display:none;">
+    <div class="card-title">Recent Generations</div>
+    <div id="historyList" class="history-list"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast">Message</div>
+
+<script>
+  // ponytail: relative for browser HTTP/S on any port; absolute for Tauri
+  const API_BASE = (window.location.protocol === 'http:' || window.location.protocol === 'https:') && !window.location.origin.includes('tauri')
+    ? ''
+    : 'http://127.0.0.1:7860';
+  let allVoices = [];
+  let currentFilterGender = "All";
+  let currentAudioBlob = null;
+  let currentWavBase64 = null;
+  let currentVoice = "af_sky";
+  let pollInterval = null;
+
+  const presets = {
+    intro: "Hello! Welcome to Kokoro TTS Studio, running completely offline and locally in Rust.",
+    story: "In a quiet valley sheltered by ancient pine trees, a gentle stream flowed over polished stones, whispering secrets to the midnight sky.",
+    news: "Good evening. Today's top headline: Open-source neural speech synthesis reaches unprecedented speed and realism on standard CPU hardware.",
+    tech: "Rust delivers guaranteed memory safety, high concurrency, and zero-cost abstractions, making it the perfect choice for production machine learning inference."
+  };
+
+  function setPreset(key) {
+    if (presets[key]) {
+      document.getElementById('textInput').value = presets[key];
+      updateCharCount();
+    }
+  }
+
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  function updateCharCount() {
+    const text = document.getElementById('textInput').value;
+    document.getElementById('charCount').textContent = `${text.length} chars (${text.trim().split(/\s+/).filter(Boolean).length} words)`;
+  }
+
+  document.getElementById('textInput').addEventListener('input', updateCharCount);
+  document.getElementById('textInput').addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      generateSpeech();
+    }
+  });
+
+  function updateSpeed(v) {
+    document.getElementById('speedVal').textContent = parseFloat(v).toFixed(2) + 'x';
+  }
+
+  function updatePitch(v) {
+    const n = parseInt(v);
+    let desc = " (Natural)";
+    if (n < -6) desc = " (Very Deep)";
+    else if (n < 0) desc = " (Deeper)";
+    else if (n > 6) desc = " (Very High)";
+    else if (n > 0) desc = " (Higher)";
+    document.getElementById('pitchVal').textContent = (n > 0 ? '+' : '') + n + desc;
+  }
+
+  function updateGain(v) {
+    document.getElementById('gainVal').textContent = parseFloat(v).toFixed(2) + 'x';
+  }
+
+  function setGenderFilter(g) {
+    currentFilterGender = g;
+    document.querySelectorAll('.filter-pill[data-gender]').forEach(el => {
+      if (el.getAttribute('data-gender') === g) {
+        el.classList.add('active');
+      } else {
+        el.classList.remove('active');
+      }
+    });
+    renderFilteredVoices();
+  }
+
+  function onFilterChange() {
+    renderFilteredVoices();
+  }
+
+  // Load voices into memory and populate UI
+  async function loadVoices() {
+    try {
+      const res = await fetch(API_BASE + '/api/voices');
+      allVoices = await res.json();
+      renderFilteredVoices();
+    } catch (e) {
+      console.error("Failed to load voices:", e);
+    }
+  }
+
+  // Render voices based on all active filters
+  function renderFilteredVoices() {
+    const searchVal = document.getElementById('voiceSearch').value.toLowerCase().trim();
+    const langVal = document.getElementById('languageFilter').value;
+    const toneVal = document.getElementById('toneFilter').value;
+    const paceVal = document.getElementById('paceFilter').value;
+
+    const filtered = allVoices.filter(v => {
+      // Gender filter
+      if (currentFilterGender !== 'All' && v.gender !== currentFilterGender) return false;
+
+      // Language filter
+      if (langVal !== 'All' && v.language !== langVal) return false;
+
+      // Tone filter
+      if (toneVal !== 'All' && v.tone !== toneVal) return false;
+
+      // Pace filter
+      if (paceVal !== 'All' && v.pace !== paceVal) return false;
+
+      // Text search
+      if (searchVal) {
+        const textToSearch = `${v.id} ${v.name} ${v.gender} ${v.language} ${v.accent} ${v.tone} ${v.description} ${(v.traits || []).join(' ')}`.toLowerCase();
+        if (!textToSearch.includes(searchVal)) return false;
+      }
+
+      return true;
+    });
+
+    const select = document.getElementById('voiceSelect');
+    const previousSelection = select.value || currentVoice;
+    select.innerHTML = '';
+
+    document.getElementById('filteredMatchCount').textContent = `${filtered.length} of ${allVoices.length} matches`;
+
+    if (filtered.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = "";
+      opt.textContent = "No matching voices found";
+      opt.disabled = true;
+      select.appendChild(opt);
+      return;
+    }
+
+    // Group by Language / Accent
+    const groups = {};
+    filtered.forEach(v => {
+      const groupKey = `${v.flag} ${v.language} (${v.accent})`;
+      if (!groups[groupKey]) groups[groupKey] = [];
+      groups[groupKey].push(v);
+    });
+
+    let hasSelected = false;
+    for (const [groupName, vList] of Object.entries(groups)) {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = groupName;
+      vList.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.id;
+        opt.textContent = `${v.name} [${v.gender}, ${v.tone}] - ${v.description}`;
+        if (v.id === previousSelection) {
+          opt.selected = true;
+          hasSelected = true;
+        }
+        optgroup.appendChild(opt);
+      });
+      select.appendChild(optgroup);
+    }
+
+    if (!hasSelected && filtered.length > 0) {
+      select.value = filtered[0].id;
+    }
+
+    onVoiceSelectionChanged();
+  }
+
+  function onVoiceSelectionChanged() {
+    const id = document.getElementById('voiceSelect').value;
+    if (!id) return;
+    currentVoice = id;
+    const voice = allVoices.find(v => v.id === id);
+    if (!voice) return;
+
+    document.getElementById('vpFlag').textContent = voice.flag;
+    document.getElementById('vpName').textContent = voice.name;
+    document.getElementById('vpId').textContent = voice.id;
+    document.getElementById('vpGender').textContent = (voice.gender === 'Female' ? '♀ ' : '♂ ') + voice.gender;
+    document.getElementById('vpTone').textContent = voice.tone;
+    document.getElementById('vpSpeedPill').textContent = `⚡ ${voice.recommended_speed.toFixed(2)}x (Apply)`;
+    document.getElementById('vpSpeedPill').setAttribute('data-speed', voice.recommended_speed);
+    document.getElementById('vpDesc').textContent = `${voice.description} • Pace: ${voice.pace}`;
+  }
+
+  function applyRecommendedSpeed() {
+    const pill = document.getElementById('vpSpeedPill');
+    const spd = parseFloat(pill.getAttribute('data-speed') || '1.0');
+    const slider = document.getElementById('speedSlider');
+    slider.value = spd;
+    updateSpeed(spd);
+    showToast(`Speed set to recommended ${spd.toFixed(2)}x`);
+  }
+
+  // Quick Voice Preview
+  async function previewCurrentVoice() {
+    const id = document.getElementById('voiceSelect').value;
+    const voice = allVoices.find(v => v.id === id);
+    if (!voice) return;
+
+    const sampleSentence = `Hello! I am ${voice.name}, speaking with the Kokoro voice model.`;
+    const speed = voice.recommended_speed || 1.0;
+
+    showToast(`Previewing ${voice.name}...`);
+
+    try {
+      const res = await fetch(API_BASE + '/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: sampleSentence,
+          voice: voice.id,
+          speed: speed,
+          pitch_semitones: 0.0,
+          gain: 1.0
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.wav_base64) {
+        const audio = new Audio("data:audio/wav;base64," + data.wav_base64);
+        audio.play();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  let currentActiveQuant = '';
+  let quantUserSelected = false;
+
+  function handleQuantChange() {
+    quantUserSelected = true;
+    const quantSelect = document.getElementById('quantizationSelect');
+    const dlText = document.getElementById('downloadBtnText');
+    if (quantSelect && dlText) {
+      if (quantSelect.value === currentActiveQuant) {
+        dlText.textContent = '↻ Re-sync';
+      } else {
+        dlText.textContent = '⚡ Switch Model';
+      }
+    }
+  }
+
+  // Check Status
+  async function checkStatus() {
+    try {
+      const res = await fetch(API_BASE + '/api/status');
+      const status = await res.json();
+
+      const dot = document.getElementById('statusDot');
+      const title = document.getElementById('modelStatusTitle');
+      const details = document.getElementById('modelStatusDetails');
+      const progressBox = document.getElementById('progressBox');
+      const dlBtn = document.getElementById('downloadModelBtn');
+      const dlText = document.getElementById('downloadBtnText');
+      const quantSelect = document.getElementById('quantizationSelect');
+
+      if (status.active_quantization) {
+        currentActiveQuant = status.active_quantization;
+        if (!quantUserSelected && quantSelect) {
+          quantSelect.value = status.active_quantization;
+        }
+      }
+
+      if (status.download.is_downloading) {
+        dot.className = 'status-dot downloading';
+        title.textContent = 'Downloading Model from Hugging Face...';
+        details.textContent = status.download.status_message;
+        progressBox.classList.add('active');
+        document.getElementById('progressBarFill').style.width = status.download.percentage.toFixed(1) + '%';
+        document.getElementById('progressPercentage').textContent = status.download.percentage.toFixed(1) + '%';
+        document.getElementById('progressStatusText').textContent = status.download.current_file;
+        dlBtn.disabled = true;
+        if (quantSelect) quantSelect.disabled = true;
+      } else {
+        progressBox.classList.remove('active');
+        dlBtn.disabled = false;
+        if (quantSelect) quantSelect.disabled = false;
+
+        const isSelectedActive = quantSelect && (quantSelect.value === currentActiveQuant);
+
+        if (status.model_cached) {
+          dot.className = 'status-dot ready';
+          const quantObj = status.quantizations ? status.quantizations.find(q => q.id === status.active_quantization) : null;
+          const quantName = quantObj ? quantObj.name : status.active_quantization.toUpperCase();
+          title.textContent = `Kokoro 82M Ready (${quantName})`;
+          const mb = ((status.model_size_bytes + status.voices_size_bytes) / 1048576).toFixed(1);
+          details.textContent = `Active: ${quantName} • Size: ${mb} MB • 54 Voices Available`;
+          if (dlText) dlText.textContent = isSelectedActive ? '↻ Re-sync' : '⚡ Switch Model';
+        } else {
+          dot.className = 'status-dot';
+          title.textContent = 'Model Files Missing';
+          details.textContent = 'Select precision and click "Download Model" to fetch from Hugging Face.';
+          if (dlText) dlText.textContent = 'Download Model';
+        }
+      }
+    } catch (e) {
+      console.error("Status check failed:", e);
+    }
+  }
+
+  // Trigger download
+  async function triggerDownload() {
+    const quantSelect = document.getElementById('quantizationSelect');
+    const quantization = quantSelect ? quantSelect.value : 'quantized';
+    try {
+      const res = await fetch(API_BASE + '/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantization })
+      });
+      const data = await res.json();
+      showToast(data.message || "Download initiated...");
+      quantUserSelected = false;
+      checkStatus();
+      if (!pollInterval) {
+        pollInterval = setInterval(checkStatus, 800);
+      }
+    } catch (e) {
+      showToast("Download request failed: " + e.message);
+    }
+  }
+
+  // Generate Speech
+  async function generateSpeech() {
+    const text = document.getElementById('textInput').value.trim();
+    if (!text) {
+      showToast("Please enter text first!");
+      return;
+    }
+
+    const voice = document.getElementById('voiceSelect').value;
+    const speed = parseFloat(document.getElementById('speedSlider').value);
+    const pitch = parseFloat(document.getElementById('pitchSlider').value);
+    const gain = parseFloat(document.getElementById('gainSlider').value);
+
+    const btn = document.getElementById('generateBtn');
+    const spinner = document.getElementById('btnSpinner');
+    const icon = document.getElementById('btnIcon');
+    const btnText = document.getElementById('btnText');
+
+    btn.disabled = true;
+    spinner.style.display = 'block';
+    icon.style.display = 'none';
+    btnText.textContent = 'Synthesizing voice...';
+
+    try {
+      const res = await fetch(API_BASE + '/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          voice,
+          speed,
+          pitch_semitones: pitch,
+          gain
+        })
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        showToast(data.error || "Generation failed.");
+        return;
+      }
+
+      currentWavBase64 = data.wav_base64;
+      currentVoice = data.voice;
+
+      // Decode base64 into Blob
+      const binaryString = atob(data.wav_base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      currentAudioBlob = new Blob([bytes.buffer], { type: 'audio/wav' });
+
+      // Update Player
+      const player = document.getElementById('audioPlayer');
+      const blobUrl = URL.createObjectURL(currentAudioBlob);
+      player.src = blobUrl;
+      player.play().catch(() => {});
+
+      // Update UI Stats
+      document.getElementById('outputCard').classList.add('active');
+      document.getElementById('outputVoiceTag').textContent = data.voice;
+      document.getElementById('statDuration').textContent = data.duration_seconds.toFixed(2) + 's';
+      document.getElementById('statLatency').textContent = data.latency_ms + 'ms';
+      document.getElementById('statSampleRate').textContent = data.sample_rate.toLocaleString() + ' Hz';
+      document.getElementById('statSamples').textContent = data.sample_count.toLocaleString();
+
+      // Add to session history
+      addHistoryItem(text, data.voice, data.duration_seconds, blobUrl);
+
+      showToast(`Generated in ${data.latency_ms}ms!`);
+    } catch (e) {
+      showToast("Error connecting to generator: " + e.message);
+    } finally {
+      btn.disabled = false;
+      spinner.style.display = 'none';
+      icon.style.display = 'block';
+      btnText.textContent = 'Generate Speech';
+    }
+  }
+
+  function downloadCurrentWav() {
+    if (!currentAudioBlob) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(currentAudioBlob);
+    const ts = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+    a.download = `kokoro_${currentVoice}_${ts}.wav`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  function addHistoryItem(text, voice, duration, blobUrl) {
+    const card = document.getElementById('historyCard');
+    card.style.display = 'block';
+    const list = document.getElementById('historyList');
+
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.innerHTML = `
+      <div>
+        <div class="hist-text">${text}</div>
+        <div class="hist-meta">${voice} • ${duration.toFixed(2)}s</div>
+      </div>
+      <button class="play-mini-btn" onclick="playAudioUrl('${blobUrl}')">▶ Play</button>
+    `;
+    list.prepend(item);
+  }
+
+  function playAudioUrl(url) {
+    const player = document.getElementById('audioPlayer');
+    player.src = url;
+    player.play().catch(() => {});
+  }
+
+  // Init
+  window.addEventListener('DOMContentLoaded', () => {
+    updateCharCount();
+    loadVoices();
+    checkStatus();
+    setInterval(checkStatus, 3000);
+  });
+</script>
+
+</body>
+</html>

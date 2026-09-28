@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kokoro TTS WebGPU - 100% In-Browser Speech Synthesis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card: rgba(18, 24, 38, 0.85);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover: rgba(255, 255, 255, 0.12);
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --primary-glow: rgba(99, 102, 241, 0.35);
+      --accent: #06b6d4;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --input-bg: rgba(11, 15, 25, 0.9);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.12) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 980px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 16px 20px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      backdrop-filter: blur(12px);
+    }
+
+    .logo-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 0 20px var(--primary-glow);
+    }
+
+    .title-area h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #fff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .title-area p {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+
+    .hardware-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #a5b4fc;
+    }
+
+    .hardware-badge.wasm {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.3);
+      color: #fcd34d;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 22px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 720px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    select, input[type="text"], textarea {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.92rem;
+      padding: 10px 14px;
+      transition: all 0.2s;
+    }
+
+    select:focus, input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 120px;
+      line-height: 1.5;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 24px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 14px var(--primary-glow);
+    }
+
+    .btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px var(--primary-glow);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
+      box-shadow: none;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.12);
+      box-shadow: none;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      transition: width 0.2s ease;
+    }
+
+    .filter-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .pill:hover, .pill.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .range-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .range-group input[type="range"] {
+      flex: 1;
+      accent-color: var(--primary);
+    }
+
+    .range-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--accent);
+      width: 44px;
+      text-align: right;
+    }
+
+    .audio-player-area {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 16px;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+    }
+
+    audio {
+      width: 100%;
+      height: 40px;
+      filter: invert(0.9) hue-rotate(180deg);
+    }
+
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim);
+    }
+
+    .banner {
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.25);
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 0.82rem;
+      color: #67e8f9;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="logo-group">
+      <div class="logo-icon">🎙️</div>
+      <div class="title-area">
+        <h1>Kokoro TTS Studio (WebGPU)</h1>
+        <p>100% In-Browser Speech Synthesis • Zero Server Costs</p>
+      </div>
+    </div>
+    <div id="hardwareBadge" class="hardware-badge">
+      Detecting Hardware...
+    </div>
+  </header>
+
+  <!-- Banner -->
+  <div class="banner">
+    <span>💡</span>
+    <span>Runs entirely in your browser using WebGPU / WASM. The model is downloaded directly to your local browser cache (IndexedDB) and executed on your PC's GPU/CPU.</span>
+  </div>
+
+  <!-- Model Setup Card -->
+  <div class="card">
+    <div class="card-title">1. Model Configuration & Loading</div>
+    <div class="grid-2">
+      <div>
+        <label for="quantSelect">Model Precision / Size:</label>
+        <select id="quantSelect">
+          <option value="q8" selected>INT8 Quantized (~88 MB) - Recommended / Fastest</option>
+          <option value="fp32">FP32 Full Precision (~311 MB) - Highest Quality</option>
+          <option value="fp16">FP16 Half Precision (~156 MB) - GPU Optimized</option>
+          <option value="q4">4-Bit Quantized (~147 MB) - Small Footprint</option>
+        </select>
+      </div>
+      <div>
+        <label for="deviceSelect">Inference Device:</label>
+        <select id="deviceSelect">
+          <option value="webgpu">WebGPU (Client GPU Acceleration)</option>
+          <option value="wasm">WebAssembly (Client CPU Fallback)</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+      <button id="loadBtn" class="btn">
+        <span id="loadBtnSpinner" class="spinner" style="display: none;"></span>
+        <span id="loadBtnText">Initialize & Download Model</span>
+      </button>
+      <div id="modelStatusText" style="font-size: 0.85rem; color: var(--text-dim);">
+        Status: Not initialized
+      </div>
+    </div>
+
+    <div id="progressArea" style="display: none; margin-top: 14px;">
+      <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted);">
+        <span id="progressFile">Downloading weights...</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-bar-container">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Speech Generation Card -->
+  <div class="card">
+    <div class="card-title">2. Text & Voice Controls</div>
+
+    <div style="margin-bottom: 14px;">
+      <label>Voice Filter (Language):</label>
+      <div class="filter-pills" id="langPills">
+        <div class="pill active" data-lang="all">All (54)</div>
+        <div class="pill" data-lang="en-us">🇺🇸 US English</div>
+        <div class="pill" data-lang="en-gb">🇬🇧 British</div>
+        <div class="pill" data-lang="ja">🇯🇵 Japanese</div>
+        <div class="pill" data-lang="zh">🇨🇳 Chinese</div>
+        <div class="pill" data-lang="es">🇪🇸 Spanish</div>
+        <div class="pill" data-lang="fr">🇫🇷 French</div>
+        <div class="pill" data-lang="it">🇮🇹 Italian</div>
+        <div class="pill" data-lang="hi">🇮🇳 Hindi</div>
+        <div class="pill" data-lang="pt">🇧🇷 Portuguese</div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom: 16px;">
+      <div>
+        <label for="voiceSelect">Selected Voice:</label>
+        <select id="voiceSelect"></select>
+      </div>
+      <div>
+        <label>Speech Speed:</label>
+        <div class="range-group" style="margin-top: 6px;">
+          <input type="range" id="speedRange" min="0.5" max="2.0" step="0.05" value="1.0">
+          <span id="speedVal" class="range-val">1.00x</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <label for="inputText">Speech Input Text:</label>
+      <textarea id="inputText" placeholder="Type or paste your text here...">Hello! This speech is being generated entirely in your web browser using WebGPU and Kokoro 82M. Zero servers, zero costs!</textarea>
+    </div>
+
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+      <button id="generateBtn" class="btn" disabled>
+        <span id="genSpinner" class="spinner" style="display: none;"></span>
+        <span id="genBtnText">Synthesize Speech</span>
+      </button>
+      <button id="sampleBtn" class="btn btn-secondary">Load Sample Text</button>
+    </div>
+
+    <!-- Output Player Area -->
+    <div id="playerArea" class="audio-player-area" style="display: none;">
+      <audio id="audioEl" controls></audio>
+      <div class="stats-row">
+        <span id="statLatency">Latency: -- ms</span>
+        <span id="statRtf">RTF: --</span>
+        <span id="statDuration">Duration: -- s</span>
+      </div>
+      <div style="display: flex; justify-content: flex-end; margin-top: 6px;">
+        <button id="downloadWavBtn" class="btn btn-secondary" style="padding: 6px 14px; font-size: 0.8rem;">
+          💾 Download .WAV
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- kokoro-js Module Script -->
+<script type="module">
+  import { KokoroTTS } from "https://esm.sh/kokoro-js@1.2.1";
+
+  // Catalog of Kokoro 54 voices
+  const VOICES = [
+    // US English Female
+    { id: "af_sky", name: "Sky (Expressive & Clear)", lang: "en-us", flag: "🇺🇸", gender: "F" },
+    { id: "af_bella", name: "Bella (Warm & Natural)", lang: "en-us", flag: "🇺🇸", gender: "F" },
+    { id: "af_sarah", name: "Sarah (Professional & News)", lang: "en-us", flag: "🇺🇸", gender: "F" },
+    { id: "af_nicole", name: "Nicole (Bright & Casual)", lang: "en-us", flag: "🇺🇸", gender: "F" },
+    { id: "af_heart", name: "Heart (Soft & Gentle)", lang: "en-us", flag: "🇺🇸", gender: "F" },
+    { id: "af_alloy", name: "Alloy (Modern & Balanced)", lang: "en-us", flag: "🇺🇸", gender: "F" },
+    { id: "af_aoede", name: "Aoede (Melodic Audiobooks)", lang: "en-us", flag: "🇺🇸", gender: "F" },
+    { id: "af_jessica", name: "Jessica (Energetic Youth)", lang: "en-us", flag: "🇺🇸", gender: "F" },
+    { id: "af_kore", name: "Kore (Calm & Peaceful)", lang: "en-us", flag: "🇺🇸", gender: "F" },
+    { id: "af_nova", name: "Nova (Lively Commercial)", lang: "en-us", flag: "🇺🇸", gender: "F" },
+    { id: "af_river", name: "River (Deep & Resonant)", lang: "en-us", flag: "🇺🇸", gender: "F" },
+    // US English Male
+    { id: "am_adam", name: "Adam (Deep Narrator)", lang: "en-us", flag: "🇺🇸", gender: "M" },
+    { id: "am_echo", name: "Echo (Conversational Podcast)", lang: "en-us", flag: "🇺🇸", gender: "M" },
+    { id: "am_eric", name: "Eric (Friendly & Approachable)", lang: "en-us", flag: "🇺🇸", gender: "M" },
+    { id: "am_fenrir", name: "Fenrir (Rich Cinematic)", lang: "en-us", flag: "🇺🇸", gender: "M" },
+    { id: "am_liam", name: "Liam (Youthful & Upbeat)", lang: "en-us", flag: "🇺🇸", gender: "M" },
+    { id: "am_michael", name: "Michael (Authoritative Broadcast)", lang: "en-us", flag: "🇺🇸", gender: "M" },
+    { id: "am_onyx", name: "Onyx (Deep Warm Tone)", lang: "en-us", flag: "🇺🇸", gender: "M" },
+    { id: "am_puck", name: "Puck (Playful Character)", lang: "en-us", flag: "🇺🇸", gender: "M" },
+    { id: "am_santa", name: "Santa (Boisterous Festive)", lang: "en-us", flag: "🇺🇸", gender: "M" },
+    // British English
+    { id: "bf_alice", name: "Alice (British Corporate)", lang: "en-gb", flag: "🇬🇧", gender: "F" },
+    { id: "bf_emma", name: "Emma (Classic RP Refined)", lang: "en-gb", flag: "🇬🇧", gender: "F" },
+    { id: "bf_isabella", name: "Isabella (Warm & Literature)", lang: "en-gb", flag: "🇬🇧", gender: "F" },
+    { id: "bf_lily", name: "Lily (Delicate Intimate)", lang: "en-gb", flag: "🇬🇧", gender: "F" },
+    { id: "bm_daniel", name: "Daniel (British Presenter)", lang: "en-gb", flag: "🇬🇧", gender: "M" },
+    { id: "bm_fable", name: "Fable (Storyteller)", lang: "en-gb", flag: "🇬🇧", gender: "M" },
+    { id: "bm_george", name: "George (Warm Conversational)", lang: "en-gb", flag: "🇬🇧", gender: "M" },
+    { id: "bm_lewis", name: "Lewis (Measured Documentary)", lang: "en-gb", flag: "🇬🇧", gender: "M" },
+    // Japanese
+    { id: "jf_alpha", name: "Alpha (Natural Clear)", lang: "ja", flag: "🇯🇵", gender: "F" },
+    { id: "jf_gongitsune", name: "Gongitsune (Folklore)", lang: "ja", flag: "🇯🇵", gender: "F" },
+    { id: "jf_nezumi", name: "Nezumi (High-Pitched Anime)", lang: "ja", flag: "🇯🇵", gender: "F" },
+    { id: "jf_tebukuro", name: "Tebukuro (Gentle Calming)", lang: "ja", flag: "🇯🇵", gender: "F" },
+    { id: "jm_kumo", name: "Kumo (Composed Standard)", lang: "ja", flag: "🇯🇵", gender: "M" },
+    // Chinese
+    { id: "zf_xiaobei", name: "Xiaobei (Beijing Accent)", lang: "zh", flag: "🇨🇳", gender: "F" },
+    { id: "zf_xiaoni", name: "Xiaoni (Broadcast News)", lang: "zh", flag: "🇨🇳", gender: "F" },
+    { id: "zf_xiaoxiao", name: "Xiaoxiao (Warm & Gentle)", lang: "zh", flag: "🇨🇳", gender: "F" },
+    { id: "zf_xiaoyi", name: "Xiaoyi (Modern Expressive)", lang: "zh", flag: "🇨🇳", gender: "F" },
+    { id: "zm_yunjian", name: "Yunjian (Articulate Formal)", lang: "zh", flag: "🇨🇳", gender: "M" },
+    { id: "zm_yunxi", name: "Yunxi (Warm Conversational)", lang: "zh", flag: "🇨🇳", gender: "M" },
+    { id: "zm_yunxia", name: "Yunxia (Deep Documentary)", lang: "zh", flag: "🇨🇳", gender: "M" },
+    { id: "zm_yunyang", name: "Yunyang (Youthful Energetic)", lang: "zh", flag: "🇨🇳", gender: "M" },
+    // Spanish
+    { id: "ef_dora", name: "Dora (Castilian Spanish)", lang: "es", flag: "🇪🇸", gender: "F" },
+    { id: "em_alex", name: "Alex (Neutral Spanish)", lang: "es", flag: "🇪🇸", gender: "M" },
+    { id: "em_santa", name: "Santa (Festive Spanish)", lang: "es", flag: "🇪🇸", gender: "M" },
+    // French
+    { id: "ff_siwis", name: "Siwis (Parisian French)", lang: "fr", flag: "🇫🇷", gender: "F" },
+    // Italian
+    { id: "if_sara", name: "Sara (Melodic Italian)", lang: "it", flag: "🇮🇹", gender: "F" },
+    { id: "im_nicola", name: "Nicola (Energetic Italian)", lang: "it", flag: "🇮🇹", gender: "M" },
+    // Hindi
+    { id: "hf_alpha", name: "Alpha (Articulate Hindi)", lang: "hi", flag: "🇮🇳", gender: "F" },
+    { id: "hf_beta", name: "Beta (Warm Hindi)", lang: "hi", flag: "🇮🇳", gender: "F" },
+    { id: "hm_omega", name: "Omega (Deep Hindi)", lang: "hi", flag: "🇮🇳", gender: "M" },
+    { id: "hm_psi", name: "Psi (Narrative Hindi)", lang: "hi", flag: "🇮🇳", gender: "M" },
+    // Portuguese
+    { id: "pf_dora", name: "Dora (Brazilian Portuguese)", lang: "pt", flag: "🇧🇷", gender: "F" },
+    { id: "pm_alex", name: "Alex (Friendly Portuguese)", lang: "pt", flag: "🇧🇷", gender: "M" },
+    { id: "pm_santa", name: "Santa (Festive Portuguese)", lang: "pt", flag: "🇧🇷", gender: "M" }
+  ];
+
+  let tts = null;
+  let currentAudioBlob = null;
+  let hasWebGPU = Boolean(navigator.gpu);
+
+  // DOM Elements
+  const hardwareBadge = document.getElementById("hardwareBadge");
+  const deviceSelect = document.getElementById("deviceSelect");
+  const quantSelect = document.getElementById("quantSelect");
+  const loadBtn = document.getElementById("loadBtn");
+  const loadBtnText = document.getElementById("loadBtnText");
+  const loadBtnSpinner = document.getElementById("loadBtnSpinner");
+  const modelStatusText = document.getElementById("modelStatusText");
+  const progressArea = document.getElementById("progressArea");
+  const progressBar = document.getElementById("progressBar");
+  const progressPct = document.getElementById("progressPct");
+  const progressFile = document.getElementById("progressFile");
+  const voiceSelect = document.getElementById("voiceSelect");
+  const speedRange = document.getElementById("speedRange");
+  const speedVal = document.getElementById("speedVal");
+  const inputText = document.getElementById("inputText");
+  const generateBtn = document.getElementById("generateBtn");
+  const genBtnText = document.getElementById("genBtnText");
+  const genSpinner = document.getElementById("genSpinner");
+  const sampleBtn = document.getElementById("sampleBtn");
+  const playerArea = document.getElementById("playerArea");
+  const audioEl = document.getElementById("audioEl");
+  const statLatency = document.getElementById("statLatency");
+  const statRtf = document.getElementById("statRtf");
+  const statDuration = document.getElementById("statDuration");
+  const downloadWavBtn = document.getElementById("downloadWavBtn");
+
+  // Initial Hardware Check
+  if (hasWebGPU) {
+    hardwareBadge.className = "hardware-badge";
+    hardwareBadge.innerHTML = "⚡ WebGPU Available (GPU)";
+    deviceSelect.value = "webgpu";
+  } else {
+    hardwareBadge.className = "hardware-badge wasm";
+    hardwareBadge.innerHTML = "💻 WebGPU Not Detected (CPU WASM)";
+    deviceSelect.value = "wasm";
+  }
+
+  // Populate Voices
+  function renderVoiceList(filterLang = "all") {
+    voiceSelect.innerHTML = "";
+    const filtered = filterLang === "all" ? VOICES : VOICES.filter(v => v.lang === filterLang);
+    filtered.forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v.id;
+      opt.textContent = `${v.flag} ${v.name} (${v.gender})`;
+      voiceSelect.appendChild(opt);
+    });
+  }
+  renderVoiceList();
+
+  // Language Pill Click Handlers
+  document.querySelectorAll("#langPills .pill").forEach(pill => {
+    pill.addEventListener("click", () => {
+      document.querySelectorAll("#langPills .pill").forEach(p => p.classList.remove("active"));
+      pill.classList.add("active");
+      renderVoiceList(pill.dataset.lang);
+    });
+  });
+
+  // Speed slider
+  speedRange.addEventListener("input", () => {
+    speedVal.textContent = Number(speedRange.value).toFixed(2) + "x";
+  });
+
+  // Sample texts
+  const SAMPLES = [
+    "Hello! This speech is being generated entirely in your web browser using WebGPU and Kokoro 82M. Zero servers, zero costs!",
+    "The quick brown fox jumps over the lazy dog near the riverbank on a warm sunny afternoon.",
+    "Artificial intelligence running directly on edge devices provides complete privacy and zero latency.",
+    "Whispers of dawn crept through the ancient pines, waking the slumbering forest in a wave of emerald light."
+  ];
+  let sampleIdx = 0;
+  sampleBtn.addEventListener("click", () => {
+    sampleIdx = (sampleIdx + 1) % SAMPLES.length;
+    inputText.value = SAMPLES[sampleIdx];
+  });
+
+  // Model Initialization
+  loadBtn.addEventListener("click", async () => {
+    const dtype = quantSelect.value;
+    const device = deviceSelect.value;
+
+    loadBtn.disabled = true;
+    loadBtnSpinner.style.display = "inline-block";
+    loadBtnText.textContent = "Loading Model...";
+    progressArea.style.display = "block";
+    modelStatusText.textContent = `Status: Fetching ${dtype.toUpperCase()} model for ${device.toUpperCase()}...`;
+
+    try {
+      tts = await KokoroTTS.from_pretrained("onnx-community/Kokoro-82M-v1.0-ONNX", {
+        dtype,
+        device,
+        progress_callback: (p) => {
+          if (p.status === "progress" && p.progress !== undefined) {
+            const pct = Math.round(p.progress);
+            progressBar.style.width = `${pct}%`;
+            progressPct.textContent = `${pct}%`;
+            if (p.file) progressFile.textContent = p.file;
+          } else if (p.status === "done") {
+            progressBar.style.width = "100%";
+            progressPct.textContent = "100%";
+          }
+        }
+      });
+
+      modelStatusText.innerHTML = `<span style="color: var(--success); font-weight: 600;">✓ Model Ready (${dtype.toUpperCase()}, ${device.toUpperCase()})</span>`;
+      loadBtnText.textContent = "Model Loaded";
+      loadBtnSpinner.style.display = "none";
+      generateBtn.disabled = false;
+    } catch (err) {
+      console.error("Initialization error:", err);
+      modelStatusText.innerHTML = `<span style="color: var(--danger); font-weight: 600;">✗ Failed: ${err.message || err}</span>`;
+      loadBtn.disabled = false;
+      loadBtnSpinner.style.display = "none";
+      loadBtnText.textContent = "Retry Initialize";
+
+      // If WebGPU failed, suggest WASM
+      if (device === "webgpu") {
+        deviceSelect.value = "wasm";
+        alert("WebGPU initialization failed on this device/browser. Automatically switched to WASM fallback. Click Initialize to try again.");
+      }
+    }
+  });
+
+  // Speech Generation
+  generateBtn.addEventListener("click", async () => {
+    const text = inputText.value.trim();
+    if (!text) {
+      alert("Please enter text to synthesize.");
+      return;
+    }
+    if (!tts) {
+      alert("Please initialize the model first.");
+      return;
+    }
+
+    const voice = voiceSelect.value;
+    const speed = parseFloat(speedRange.value) || 1.0;
+
+    generateBtn.disabled = true;
+    genSpinner.style.display = "inline-block";
+    genBtnText.textContent = "Generating...";
+
+    const startTime = performance.now();
+
+    try {
+      const audioResult = await tts.generate(text, {
+        voice,
+        speed
+      });
+
+      const elapsedMs = Math.round(performance.now() - startTime);
+
+      // Convert to playable Blob
+      currentAudioBlob = audioResult.toBlob();
+      const audioUrl = URL.createObjectURL(currentAudioBlob);
+
+      audioEl.src = audioUrl;
+      playerArea.style.display = "flex";
+
+      // Calculate stats
+      audioEl.onloadedmetadata = () => {
+        const dur = audioEl.duration;
+        statLatency.textContent = `Latency: ${elapsedMs} ms`;
+        statDuration.textContent = `Duration: ${dur.toFixed(2)} s`;
+        const rtf = (elapsedMs / (dur * 1000)).toFixed(2);
+        statRtf.textContent = `RTF: ${rtf}x (${rtf < 1.0 ? 'Faster than realtime' : 'Near realtime'})`;
+      };
+
+      audioEl.play().catch(e => console.log("Autoplay blocked:", e));
+
+    } catch (err) {
+      console.error("Synthesis error:", err);
+      alert("Generation error: " + (err.message || err));
+    } finally {
+      generateBtn.disabled = false;
+      genSpinner.style.display = "none";
+      genBtnText.textContent = "Synthesize Speech";
+    }
+  });
+
+  // Download WAV
+  downloadWavBtn.addEventListener("click", () => {
+    if (!currentAudioBlob) return;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(currentAudioBlob);
+    a.download = `kokoro_${voiceSelect.value}_${Date.now()}.wav`;
+    a.click();
+  });
+</script>
+
+</body>
+</html>
